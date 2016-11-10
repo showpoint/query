@@ -1,60 +1,69 @@
 --{-# OPTIONS_GHC -ddump-deriv #-}
-{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 module Main where
-  import Data.Monoid
-
   import Core.Types
-  import Expr
 
-  data Query b r
-    = VarQ r
-    | LetQ (Query b r) (Query b r)
-    | BinOpQ b (Query b r) (Query b r)
-    | NotQ (Query b r)
-    | IfQ (Query b r) (Query b r) (Query b r)
-    | WhileQ (Query b r) (Query b r)
-    | AndThenQ (Query b r) (Query b r)
-    | RecQ (Query b r)
-    | StopQ
+  data BinOp
+    = Add
+    | Sub
+    | Mul
+    | Div
+    | And
+    | Or
+    | Not
+    deriving (Eq, Ord, Show)
+
+  data ExprF a
+    = Lit String
+    | Var Name
+    | Let Name a
+    | BinOp BinOp a a
+    deriving (Show)
+
+  data Expr a = Expr { unExpr :: ExprF (Expr a) }
+    deriving (Show, Functor, Foldable)
+
+  data QueryF a
+    = ExprQ (forall b. b -> Bool) (ExprF a)
+    | RecQ a
     | AnyQ
-    | AndQ (Query b r) (Query b r)
-    | OrQ (Query b r) (Query b r)
-    deriving (Functor, Foldable, Traversable)
+    | AndQ a a
+    | OrQ a a
 
-  match AnyQ _ = True
-  match StopQ Stop = True
-  match (VarQ f) (Var a) = f a
-  match (LetQ qr qe) (Let r e) = match qr r && match qe e
-  match (BinOpQ f ql qr) (BinOp op l r) = f op && match ql l && match qr r
-  match (NotQ qe) (Not e) = match qe e
-  match (IfQ qi qt qe) (If ei et ee) = match qi ei && match qt et && match qe ee
-  match (WhileQ qw qe) (While w e) = match qw w && match qe e
-  match (AndThenQ qf qn) (AndThen f n) = match qf f && match qn n
-  match qr@(RecQ q) e@(Let _ e1) = match q e || match qr e1
-  match qr@(RecQ q) e@(BinOp _ l r) = match q e || match qr l || match qr r
-  match qr@(RecQ q) e@(Not e1) = match q e || match qr e1
-  match qr@(RecQ q) e@(If i t e1) = match q e || match qr i || match qr t || match qr e1
-  match qr@(RecQ q) e@(While w e1) = match q e || match qr w || match qr e
-  match qr@(RecQ q) e@(AndThen f n) = match q e || match qr f || match qr n
-  match (RecQ q) e = match q e
-  match (AndQ ql qr) e = match ql e && match qr e
-  match (OrQ ql qr) e = match ql e || match qr e
-  match _ _ = False
+  data Query a = Query { unQuery :: QueryF (Query a) }
 
-  true = const True
-  nameIs n = VarQ $ \(Ref n') -> n == n'
-  binOpQ = BinOpQ
-  assign = LetQ
-  expr = AnyQ
-  notQ = NotQ
-  anyQ = RecQ
-  andQ = AndQ
-  orQ = OrQ
+  deriving instance Functor ExprF
+  deriving instance Foldable ExprF
 
-  test = anyQ (nameIs "A" `orQ` nameIs "B")
+  deriving instance Functor QueryF
+  deriving instance Foldable QueryF
 
-  t = BinOp Add (Not (BinOp And (Var (Ref "C")) (Var (Ref "A")))) (Var (Ref "B"))
+  match :: Query a -> Expr a -> Bool
+  match q e = matchQ (unQuery q) (unExpr e)
+
+  matchQ :: QueryF (Query a) -> ExprF (Expr a) -> Bool
+  matchQ AnyQ _ = True
+  matchQ (RecQ q) e = matchQ (unQuery q) e || foldl (\b e' -> matchQ (RecQ q) (unExpr e')) True e
+  matchQ (AndQ l r) e = matchQ (unQuery l) e && matchQ (unQuery r) e
+  matchQ (OrQ l r) e = matchQ (unQuery l) e || matchQ (unQuery r) e
+  matchQ (ExprQ f q) e = f e || foldl (\b e' -> matchE f q (unExpr e')) True e
+
+  matchE :: (forall b. b -> Bool) -> ExprF (Query a) -> ExprF (Expr a) -> Bool
+  matchE f (Let _ qe) e@(Let _ ee) = f e || matchQ (unQuery qe) (unExpr ee)
+  matchE f (BinOp _ ql qr) e@(BinOp _ l r) = f e || matchQ (unQuery ql) (unExpr l) || matchQ (unQuery qr) (unExpr r)
+  matchE f _ e = f e
+
+  expr = Expr (Let "A" (Expr $ Lit "1"))
+
+  named = ExprQ (\case Var n -> True; _ -> False) (Var "")
+
+  test = Query AnyQ
 
   main :: IO ()
-  main = print $ match test t
+  main = do
+    print expr
+    print $ match test expr
