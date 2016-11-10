@@ -1,69 +1,78 @@
---{-# OPTIONS_GHC -ddump-deriv #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
 module Main where
   import Core.Types
 
-  data BinOp
-    = Add
-    | Sub
-    | Mul
-    | Div
-    | And
-    | Or
-    | Not
-    deriving (Eq, Ord, Show)
+  class ExprC r where
+    lit :: String -> r
+    var :: Name -> r
+    let_ :: Name -> r -> r
+    add :: r -> r -> r
 
-  data ExprF a
+  class QueryC r where
+    recQ :: r -> r
+    anyQ :: r
+    andQ :: r -> r -> r
+    orQ :: r -> r -> r
+
+  instance ExprC String where
+    lit c = c
+    var n = n
+    let_ n r = n ++ " = " ++ r
+    add l r = l ++ " + " ++ r
+
+  data Expr
     = Lit String
     | Var Name
-    | Let Name a
-    | BinOp BinOp a a
+    | Let Name Expr
+    | Add Expr Expr
     deriving (Show)
 
-  data Expr a = Expr { unExpr :: ExprF (Expr a) }
-    deriving (Show, Functor, Foldable)
-
-  data QueryF a
-    = ExprQ (forall b. b -> Bool) (ExprF a)
-    | RecQ a
+  data Query a
+    = RecQ a
     | AnyQ
     | AndQ a a
     | OrQ a a
 
-  data Query a = Query { unQuery :: QueryF (Query a) }
+  instance ExprC (Expr -> Bool) where
+    lit c = \case
+      Lit c' -> c == c'
+      _ -> False
+    var n = \case
+      Var n' -> n == n'
+      _ -> False
+    let_ n qe = \case
+      Let n' e -> n == n' || qe e
+      _ -> False
+    add ql qr = \case
+      Add l r -> ql l && qr r
+      _ -> False
 
-  deriving instance Functor ExprF
-  deriving instance Foldable ExprF
+  instance QueryC (Expr -> Bool) where
+    recQ q = \case
+      e@(Let _ e') -> q e || recQ q e'
+      e@(Add l r) -> q e || recQ q l || recQ q r
+      e -> q e
+    anyQ = const True
+    andQ l r e = l e && r e
+    orQ l r e = l e || r e
 
-  deriving instance Functor QueryF
-  deriving instance Foldable QueryF
+  instance ExprC Expr where
+    lit = Lit
+    var = Var
+    let_ = Let
+    add = Add
 
-  match :: Query a -> Expr a -> Bool
-  match q e = matchQ (unQuery q) (unExpr e)
+  expr = let_ "a" (var "c" `add` (lit "2" `add` lit "1"))
 
-  matchQ :: QueryF (Query a) -> ExprF (Expr a) -> Bool
-  matchQ AnyQ _ = True
-  matchQ (RecQ q) e = matchQ (unQuery q) e || foldl (\b e' -> matchQ (RecQ q) (unExpr e')) True e
-  matchQ (AndQ l r) e = matchQ (unQuery l) e && matchQ (unQuery r) e
-  matchQ (OrQ l r) e = matchQ (unQuery l) e || matchQ (unQuery r) e
-  matchQ (ExprQ f q) e = f e || foldl (\b e' -> matchE f q (unExpr e')) True e
-
-  matchE :: (forall b. b -> Bool) -> ExprF (Query a) -> ExprF (Expr a) -> Bool
-  matchE f (Let _ qe) e@(Let _ ee) = f e || matchQ (unQuery qe) (unExpr ee)
-  matchE f (BinOp _ ql qr) e@(BinOp _ l r) = f e || matchQ (unQuery ql) (unExpr l) || matchQ (unQuery qr) (unExpr r)
-  matchE f _ e = f e
-
-  expr = Expr (Let "A" (Expr $ Lit "1"))
-
-  named = ExprQ (\case Var n -> True; _ -> False) (Var "")
-
-  test = Query AnyQ
+  test = recQ (lit "2")
 
   main :: IO ()
   main = do
-    print expr
-    print $ match test expr
+    let e = expr :: Expr
+    print e
+    print (expr :: String)
+    print (test e :: Bool)
