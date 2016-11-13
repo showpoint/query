@@ -22,5 +22,6 @@ executable query
                      , bytestring
                      , conduit
                      , conduit-combinators
+                     , containers
                      , persistent
                      , persistent-template
