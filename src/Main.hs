@@ -38,6 +38,10 @@ module Main where
     var n = pure $ Expr (Var n)
     let_ n e = Expr . Let n <$> e
 
+  instance NameC Name (Maybe (ExprF a)) where
+    var n = pure (Var n)
+    let_ n e = pure (Let n (unExpr e))
+
   instance NameC Name (Expr a -> Maybe (Expr a)) where
     var n = var (n ==)
     let_ n = let_ (n ==)
@@ -58,6 +62,32 @@ module Main where
       Next el er -> liftM2 next (l el) (r er)
       _ -> Nothing
 
+  class NameQ n r where
+    nameQ :: n -> r -> r
+
+  instance {-# OVERLAPPABLE #-} NameQ a String where
+    nameQ _ e = " @?" ++ e
+
+  instance NameQ Name String where
+    nameQ n e = " @\"" ++ n ++ "\" " ++ e
+
+  instance NameQ Name (Expr a -> Maybe (Expr a)) where
+    nameQ n = nameQ (n==)
+
+  instance NameQ (Name -> Bool) (Expr a -> Maybe (Expr a)) where
+    nameQ f q e = Expr <$> fmap (nameQ f) (fmap unExpr . q) e
+
+  instance NameQ (Name -> Bool) (ExprF a -> Maybe (ExprF a)) where
+    nameQ f q e = case e of
+      Var n | f n -> q e
+      Let n _ | f n -> q e
+      _ -> Nothing
+
+  explore f q e@(Let n e') = f e $ let_ n (q e')
+  explore f q e@(Add l r) = f e $ add (q l) (q r)
+  explore f q e@(Next l r) = f e $ next (q l) (q r)
+  explore f q e = f e id
+
   expr = let_ "a" ((var "c" `add` var "c") `add` (lit "1" `add` var "b"))
     `next`
       let_ "c" (var "a" `add` var "b")
@@ -66,6 +96,7 @@ module Main where
 
   match = recQ ((var anyV `orQ` lit anyV) `add` recQ (var "b"))
   match2 = recQ (let_ "c" anyQ)
+  match3 = recQ (nameQ "c" anyQ)
 
   main :: IO ()
   main = do
@@ -77,5 +108,9 @@ module Main where
       Nothing -> putStrLn "Nothing found."
     putStrLn (match2 :: String)
     case match2 e :: Maybe (Expr String) of
+      Just e' -> putStrLn (exec e')
+      Nothing -> putStrLn "Nothing found."
+    putStrLn (match3 :: String)
+    case match3 e :: Maybe (Expr String) of
       Just e' -> putStrLn (exec e')
       Nothing -> putStrLn "Nothing found."
