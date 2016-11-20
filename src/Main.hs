@@ -28,7 +28,7 @@ module Main where
   anyV = const True :: String -> Bool
 
   match1 = recQ ((var anyV `orQ` lit anyV) `add` recQ (var "b"))
-  match2 = recQ (hasQ (var "c"))
+  match2 = recQ (notQ (hasQ (var "c")))
 
   main :: IO ()
   main = do

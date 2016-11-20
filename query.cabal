@@ -25,5 +25,6 @@ executable query
                      , containers
                      , mtl
                      , monadplus
+                     , newtype-generics
                      , persistent
                      , persistent-template
