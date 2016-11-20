@@ -23,5 +23,7 @@ executable query
                      , conduit
                      , conduit-combinators
                      , containers
+                     , mtl
+                     , monadplus
                      , persistent
                      , persistent-template

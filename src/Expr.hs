@@ -9,7 +9,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 module Expr where
+  import Control.Applicative
+  import Control.Monad
   import Core.Types
+  import Deep
 
   data ExprF a
     = Lit String
@@ -20,6 +23,7 @@ module Expr where
     deriving (Show)
 
   data Expr a = Expr { unExpr :: ExprF (Expr a)}
+    deriving (Show)
 
   deriving instance Functor ExprF
   deriving instance Foldable ExprF
@@ -64,6 +68,40 @@ module Expr where
   instance ExprC String where
     add l r = l ++ " + " ++ r
     next l r = l ++ "; " ++ r
+
+  instance MonadPlus m => LiteralC String (Expr a -> m (Expr a)) where
+    lit c = lit (== c)
+
+  instance MonadPlus m => LiteralC (String -> Bool) (Expr a -> m (Expr a)) where
+    lit f e = case unExpr e of
+      Lit c | f c -> pure (lit c)
+      _ -> empty
+
+  instance MonadPlus m => NameC Name (Expr a -> m (Expr a)) where
+    var n = var (== n)
+    let_ n = let_(== n)
+
+  instance MonadPlus m => NameC (Name -> Bool) (Expr a -> m (Expr a)) where
+    var f e = case unExpr e of
+      Var n | f n -> pure (var n)
+      _ -> empty
+    let_ f q e = case unExpr e of
+      Let n e' | f n -> let_ n <$> q e'
+      _ -> empty
+
+  instance MonadPlus m => ExprC (Expr a -> m (Expr a)) where
+    add l r e = case unExpr e of
+      Add el er -> add <$> l el <*> r er
+      _ -> empty
+    next l r e = case unExpr e of
+      Next el er -> next <$> l el <*> r er
+      _ -> empty
+
+  instance MonadPlus m => DeepC (Expr a) m where
+    deep f (Expr (Let _ e)) = f e
+    deep f (Expr (Add l r)) = f l <|> f r
+    deep f (Expr (Next l r)) = f l <|> f r
+    deep f _ = empty
 
   exec :: (LiteralC String a, NameC Name a, ExprC a) => Expr a -> a
   exec = exec' . unExpr
