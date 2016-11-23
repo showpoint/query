@@ -29,4 +29,4 @@ module Query where
     anyQ = pure
     andQ l r e = e <$ l e <* r e
     orQ l r e = l e <|> r e
-    notQ q e = undefined
+    notQ = undefined

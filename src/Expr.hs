@@ -73,29 +73,26 @@ module Expr where
     lit c = lit (== c)
 
   instance MonadPlus m => LiteralC (String -> Bool) (Expr a -> m (Expr a)) where
-    lit f e = case unExpr e of
-      Lit c | f c -> pure (lit c)
-      _ -> empty
+    lit f (Expr (Lit c)) | f c = pure (lit c)
+    lit _ _ = empty
 
   instance MonadPlus m => NameC Name (Expr a -> m (Expr a)) where
     var n = var (== n)
     let_ n = let_(== n)
 
   instance MonadPlus m => NameC (Name -> Bool) (Expr a -> m (Expr a)) where
-    var f e = case unExpr e of
-      Var n | f n -> pure (var n)
-      _ -> empty
-    let_ f q e = case unExpr e of
-      Let n e' | f n -> let_ n <$> q e'
-      _ -> empty
+    var f (Expr (Var n)) | f n = pure (var n)
+    var _ _ = empty
+
+    let_ f q (Expr (Let n e')) | f n = let_ n <$> q e'
+    let_ _ _ _ = empty
 
   instance MonadPlus m => ExprC (Expr a -> m (Expr a)) where
-    add l r e = case unExpr e of
-      Add el er -> add <$> l el <*> r er
-      _ -> empty
-    next l r e = case unExpr e of
-      Next el er -> next <$> l el <*> r er
-      _ -> empty
+    add l r (Expr (Add el er)) = add <$> l el <*> r er
+    add _ _ _ = empty
+
+    next l r (Expr (Next el er)) = next <$> l el <*> r er
+    next _ _ _ = empty
 
   instance MonadPlus m => DeepC (Expr a) m where
     deep f (Expr (Let _ e)) = f e
