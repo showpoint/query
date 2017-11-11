@@ -1,11 +1,9 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE LambdaCase #-}
 module Main where
   import Control.Applicative
   import Control.Monad
@@ -20,24 +18,39 @@ module Main where
   import Query
   import Deep
 
-  expr = let_ "a" ((var "c" `add` var "c") `add` (lit "1" `add` var "b"))
-    `next`
-      let_ "c" (var "a" `add` (var "b" `add` var "c"))
-    `next`
-      let_ "b" (var "c" `add` (var "b" `add` var "c"))
+  newtype Vars a = Vars { unVars :: (Name, Expr a)}
 
-  anyV = const True :: String -> Bool
+  expr = let_ "a" (lit "1" `add` lit "2")
+    `next`
+      let_ "b" (var "a" `add` (lit "3" `add` var "a"))
+    `next`
+      let_ "c" (var "b" `add` (var "a" `add` var "b") `add` lit "4")
 
-  match1 = recQ ((var anyV `orQ` lit anyV) `add` recQ (var "b"))
+  anyV :: String -> Bool
+  anyV = const True
+
+  match1 = recQ $ lit anyV
   match2 = recQ (notQ (hasQ (var "c")))
+  match3 = recQ $ lit "a"
 
   main :: IO ()
   main = do
     let e = expr :: Expr String
+    putStr "Expr: "
     putStrLn (expr :: String)
-    putStrLn (match1 :: String)
-    case match1 e :: Maybe (Expr String) of
+    putStr "\n"
+
+    putStrLn $ "Match 1: " <> (match1 :: String)
+    putStr "-- matched expressions: "
+    print (match1 e :: [Expr String])
+
+    putStr "-- executed: "
+    print $ map exec (match1 e :: [Expr String])
+
+    case match3 e :: Maybe (Expr String) of
       Just e' -> putStrLn (exec e')
       Nothing -> putStrLn "Nothing found."
-    putStrLn (match2 :: String)
+
+    putStrLn $ "match2: " <> (match2 :: String)
+    print (match2 e :: [Expr String])
     mapM_ (putStrLn . exec) (match2 e :: [Expr String])

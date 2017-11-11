@@ -7,7 +7,6 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
 module Expr where
   import Control.Applicative
   import Control.Monad
@@ -22,7 +21,7 @@ module Expr where
     | Next a a
     deriving (Show)
 
-  data Expr a = Expr { unExpr :: ExprF (Expr a)}
+  newtype Expr a = Expr { unExpr :: ExprF (Expr a)}
     deriving (Show)
 
   deriving instance Functor ExprF
@@ -55,15 +54,15 @@ module Expr where
     lit = show
 
   instance {-# OVERLAPPABLE #-} LiteralC a String where
-    lit _ = "lit @"
+    lit _ = "lit γ"
 
   instance NameC Name String where
     var n = n
     let_ n r = n ++ " = " ++ r
 
   instance {-# OVERLAPPABLE #-} NameC a String where
-    var _ = "var @"
-    let_ _ r = "@ = " ++ r
+    var _ = "var γ"
+    let_ _ r = "γ = " ++ r
 
   instance ExprC String where
     add l r = l ++ " + " ++ r

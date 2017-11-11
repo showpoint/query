@@ -16,7 +16,9 @@ executable query
   hs-source-dirs:      src
   main-is:             Main.hs
   other-modules:       Core.Types
+                       Deep
                        Expr
+                       Query
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
                      , bytestring
@@ -27,3 +29,4 @@ executable query
                      , monadplus
                      , persistent
                      , persistent-template
+                     , recursion-schemes
