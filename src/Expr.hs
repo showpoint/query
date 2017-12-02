@@ -97,7 +97,7 @@ module Expr where
     deep f (Expr (Let _ e)) = f e
     deep f (Expr (Add l r)) = f l <|> f r
     deep f (Expr (Next l r)) = f l <|> f r
-    deep f _ = empty
+    deep _ _ = empty
 
   exec :: (LiteralC String a, NameC Name a, ExprC a) => Expr a -> a
   exec = exec' . unExpr

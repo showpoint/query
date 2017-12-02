@@ -7,4 +7,4 @@ module Deep where
     deep :: (r -> m r) -> r -> m r
 
   instance {-# OVERLAPPABLE #-} Alternative m => DeepC a m where
-    deep f a = empty
+    deep _ _ = empty
