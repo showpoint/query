@@ -7,14 +7,14 @@ module Query where
   import Data.Monoid
   import Deep
 
-  data Query r
-    = RecQ (Query r)
-    | HasQ (Query r)
-    | AnyQ 
-    | AndQ (Query r) (Query r)
-    | OrQ (Query r) (Query r)
-    | NotQ (Query r)
-    | MatchQ (Query r)
+  data Query e a
+    = ReqQ a
+    | HasQ a
+    | AnyQ
+    | AndQ a a
+    | OrQ a a
+    | NotQ a
+    | MatchQ e 
 
   class QueryC r where
     recQ :: r -> r
@@ -24,15 +24,6 @@ module Query where
     orQ :: r -> r -> r
     notQ :: r -> r
     matchQ :: r -> r
-  
-  instance QueryC (Query r) where
-    recQ   = RecQ
-    hasQ   = HasQ
-    anyQ   = AnyQ 
-    andQ   = AndQ
-    orQ    = OrQ
-    notQ   = NotQ
-    matchQ = MatchQ
 
   instance QueryC String where
     recQ q = "deep (" <> q <> ")"

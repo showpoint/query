@@ -1,6 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
@@ -9,6 +8,7 @@ module Main where
   import Expr
   import Query
 
+  expr :: (LiteralC String r, NameC String r, ExprC r) => r
   expr = let_ "a" (lit "1" `add` lit "2")
     `next`
       let_ "b" (var "a" `add` (lit "3" `add` var "a"))
@@ -18,8 +18,13 @@ module Main where
   anyV :: String -> Bool
   anyV = const True
 
-  match1 = recQ $ let_ anyV (hasQ (var "a") `andQ` hasQ (lit "4"))
+  match1 :: (LiteralC (String -> Bool) r, NameC (String -> Bool) r, QueryC r) => r
+  match1 = recQ $ let_ anyV (hasQ (lit anyV))
+  
+  match2 :: (NameC String r, QueryC r) => r
   match2 = recQ (notQ (hasQ (var "c")) `andQ` notQ (hasQ (let_ "c" anyQ)))
+
+  match3 :: (LiteralC String r, QueryC r) => r
   match3 = recQ $ lit "4"
 
   main :: IO ()
@@ -27,6 +32,7 @@ module Main where
     let e = expr :: Expr String
     putStr "Expr: "
     putStrLn (expr :: String)
+    print (expr :: Expr String)
     putStr "\n"
 
     putStrLn $ "Match 1: " <> (match1 :: String)
