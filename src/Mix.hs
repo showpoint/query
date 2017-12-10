@@ -9,123 +9,73 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 module Main where
   import Prelude hiding (any)
-  import Data.Monoid hiding (Any)
+  import Data.Functor.Foldable
+  import Data.Monoid ((<>))
 
-  data ExprF v a
-    = Lit v
-    | Var v
+  import Classes
+
+  data ExprF a
+    = Lit Name
+    | Var Name
     | Let a a
     | Add a a
     | AndNext a a
-    deriving (Show, Functor)
+    deriving (Show, Functor, Foldable, Traversable)
 
   data QueryF e a
     = Match e
-    | Has a
+    | Has (QueryF e a)
     | Any
-    deriving (Show, Functor)
+    deriving (Show, Functor, Foldable, Traversable)
 
-  newtype Expr v a = Expr { unExpr :: ExprF v (Expr v a)} deriving (Show, Functor)
-  newtype Query e a = Query { unQuery :: QueryF e (Query e a)} deriving (Show, Functor)
-  newtype ExprQ v a = ExprQ { unExprQ :: ExprF v (QueryE v a)} deriving (Show, Functor)
-  newtype QueryE v a = QueryE { unQueryE :: QueryF (ExprQ v a) (QueryE v a)} deriving (Show)
-
-  instance Functor (QueryE v) where
-    fmap f (QueryE (Match e)) = QueryE (Match (fmap f e))
-    fmap f (QueryE (Has a)) = QueryE (Has (fmap f a))
-    fmap f (QueryE Any) = QueryE Any
+  type Expr = Fix ExprF
   
-  class ExprC v a | a -> v where
-    lit :: v -> a
-    var :: v -> a
-    let_ :: a -> a -> a
-    add :: a -> a -> a
-    andNext :: a -> a -> a
+  newtype Query e a = Query { unQuery :: QueryF (e (Query e a)) a }
 
-  instance ExprC String (Expr String a) where
-    lit = Expr . Lit
-    var = Expr . Var
-    let_ l r = Expr (Let l r)
-    add l r = Expr (Add l r)
-    andNext l r = Expr (AndNext l r)
+  type ExprQ a = Query ExprF a
 
-  instance ExprC String (ExprQ String a) where
-    lit = ExprQ . Lit
-    var = ExprQ . Var
-    let_ l r = ExprQ (Let l r)
-    add l r = ExprQ (Add l r)
-    andNext l r = QueryE (Match (ExprQ (AndNext l r)))
+  ppExpr = cata pp where
+    pp (Lit v) = v
+    pp (Var v) = v
+    pp (Let l r) = l <> " = " <> r
+    pp (Add l r) = l <> " + " <> r 
+    pp (AndNext l r) = l <> "; " <> r
 
-  instance ExprC String (QueryE String a) where
-    lit = QueryE . Match . ExprQ . Lit
-    var = QueryE . Match . ExprQ . Var
-    let_ l r = QueryE (Match (ExprQ (Let l r)))
-    add l r = QueryE (Match (ExprQ (Add l r)))
-    andNext l r = QueryE (Match (ExprQ (AndNext l r)))
+  instance ExprC Expr where
+    lit = Fix . Lit
+    var = Fix . Var
+    let_ l = Fix . Let l
+    add l = Fix . Add l
+    andNext l = Fix . AndNext l
 
-  instance ExprC String String where
-    lit = mappend "lit "
-    var = mappend "var "
-    let_ l r = l <> " = " <> r
-    add l r = l <> " + " <> r
-    andNext l r = l <> "; " <> r
-    
-  class QueryC e a | a -> e where
-    any :: a
+  instance ExprC (ExprQ a) where
+    lit = Query . Match . Lit
+    var = Query . Match . Var
+    let_ l = Query . Match . Let l
+    add l = Query . Match . Add l
+    andNext l = Query . Match . AndNext l
 
-  instance QueryC a (QueryE String a) where
-    any = QueryE Any
+  instance QueryC (ExprQ a) where
+    any = Query Any
+    has = Query . Has . unQuery
 
-  instance QueryC String String where
-    any = "any"
-
-  class PrintF a where
-    printF :: a -> String
-
-  instance PrintF a => PrintF (ExprF String a) where
-    printF (Lit a) = "lit " <> a
-    printF (Var a) = "var " <> a
-    printF (Let l r) = printF l <> " = " <> printF r
-    printF (Add l r) = printF l <> " + " <> printF r
-    printF (AndNext l r) = printF l <> "; " <> printF r
-
-  instance (PrintF a, PrintF (ExprQ String a)) => PrintF (QueryF (ExprQ String a) a) where
-    printF (Match e) = "match " <> printF e
-    printF Any = "any"
-
-  instance (PrintF a, PrintF (QueryE String a)) => PrintF (ExprQ String a) where
-    printF (ExprQ a) = printF a
-
-  instance PrintF (QueryE String a) where
-    printF (QueryE (Match (ExprQ a))) = printF a
-    printF (QueryE (Has a)) = printF a
-    printF (QueryE Any) = "any"
-    
-  instance PrintF String where
-    printF = id
-
-  expr = 
-      let_ (var "a") (lit "1")
+  e1 :: Expr
+  e1 = let_ (var "a") (lit "1")
     `andNext`
-      let_ (var "b") (add (lit "a") (var "b"))
+      let_ (var "b") (lit "2")
+    `andNext`
+      let_ (var "c") (add (var "a") (var "b"))
 
-  q1 = var "a"
-  q2 = add any (var "b")
-  q3 = let_ (var "a") (add (var "b") any)
+  qa = Query (Match (Add (Query Any) (Query Any)))
+  qb = Query (Has (Match (Var "a")))
+  qc = Query Any
 
-  class Monoid (m e) => Match q e m where
-    match :: q -> e -> m e
+  q1 = Query (Match (Let qc (Query (Match (Add qa qb)))))
 
-  instance (Applicative m, Foldable m, Eq v, Monoid (m a), Match a a m) => Match (ExprF v a) (ExprF v a) m where
-    match (Var n)       e@(Var n') | n == n' = pure e
-    match (Lit n)       e@(Lit n') | n == n' = pure e
-    match (Let l r)     e@(Let l' r')        = fmap (const e) (match l l' <> match r r')
-    match (Add l r)     e@(Add l' r')        = if not (null (match l l' <> match r r')) then pure e else mempty
-    match (AndNext l r) e@(AndNext l' r')    = if not (null (match l l' <> match r r')) then pure e else mempty
-
+  main :: IO ()
   main = do
-    let e :: QueryE String String = expr
-    putStrLn $ printF e
-    print (q3 :: QueryE String String)
+    putStrLn (ppExpr e1)
+    -- print q1
