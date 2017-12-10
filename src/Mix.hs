@@ -35,6 +35,23 @@ module Main where
   
   newtype Query e a = Query { unQuery :: QueryF (e (Query e a)) a }
 
+  deriving instance Show (e (Query e a)) => Show (Query e a)
+
+  class Applicative f => Match q e f r where
+    alg :: r -> f r
+    match :: q -> e -> f r
+ 
+  instance (Applicative f, Match a e (f e)) => Match (ExprF a) Expr (f Expr) where
+    match (Lit n) e@(Fix (Lit n')) | n == n' = pure e 
+    match (Var n) e@(Fix (Var n')) | n == n' = pure e 
+    match (Add l r) e@(Fix (Add l' r')) = (pure . e <>) <$> match l l' <> match r r'
+
+  instance Applicative f => Match (ExprQ a) Expr (f Expr) where
+    match q e = matchQ (unQuery q) e where
+      matchQ Any e = pure e
+      matchQ (Has q') e = matchQ q' e
+      matchQ (Match e') e = match e' e
+
   type ExprQ a = Query ExprF a
 
   ppExpr = cata pp where
@@ -69,13 +86,13 @@ module Main where
     `andNext`
       let_ (var "c") (add (var "a") (var "b"))
 
-  qa = Query (Match (Add (Query Any) (Query Any)))
-  qb = Query (Has (Match (Var "a")))
-  qc = Query Any
+  qa = add any any
+  qb = has (var "a")
+  qc = any
 
-  q1 = Query (Match (Let qc (Query (Match (Add qa qb)))))
+  q1 = let_ qc (add qa qb)
 
   main :: IO ()
   main = do
     putStrLn (ppExpr e1)
-    -- print q1
+    print (q1 :: ExprQ String)
