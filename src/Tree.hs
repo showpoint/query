@@ -43,11 +43,3 @@ module Tree where
     project (Let a e) = Let a <$> project e
     project (Add l r) = Add <$> project l <*> project r
     project (Bind l r) = Bind <$> project l <*> project r
-
-  test = cata alg
-    where
-      alg (Lit a) = a
-      alg (Var a) = a
-      alg (Let a e) = a <> e
-      alg (Add a e) = a <> e
-      alg (Bind a e) = a <> e

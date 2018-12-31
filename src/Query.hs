@@ -5,7 +5,7 @@ module Query where
   import Control.Applicative
   import Control.Monad
   import Data.Monoid
-  import Deep
+  import Expr.Deep
 
   data Query e a
     = ReqQ a

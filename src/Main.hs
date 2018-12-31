@@ -19,34 +19,35 @@ module Main where
   anyV = const True
 
   match1 :: (LiteralC (String -> Bool) r, NameC (String -> Bool) r, QueryC r) => r
-  match1 = recQ $ let_ anyV (hasQ (lit anyV))
+  match1 = recQ $ let_ anyV anyQ
   
-  match2 :: (NameC String r, QueryC r) => r
-  match2 = recQ (notQ (hasQ (var "c")) `andQ` notQ (hasQ (let_ "c" anyQ)))
+  match2 :: (NameC String r, NameC (String -> Bool) r, ExprC r, QueryC r) => r
+  match2 = recQ $ let_ anyV (hasQ (var "a" `add` var "b"))
 
-  match3 :: (LiteralC String r, QueryC r) => r
-  match3 = recQ $ lit "4"
+  match3 :: (NameC (String -> Bool) r, QueryC r) => r
+  match3 = recQ $ var anyV
 
   main :: IO ()
   main = do
     let e = expr :: Expr String
-    putStr "Expr: "
+    putStrLn "Expr: "
     putStrLn (expr :: String)
-    print (expr :: Expr String)
-    putStr "\n"
+    putStrLn ""
 
-    putStrLn $ "Match 1: " <> (match1 :: String)
-    putStr "-- matched expressions: "
-    print (match1 e :: [Expr String])
+    putStrLn ("Match 1: " <> match1 :: String)
+    putStrLn "- matched: "
+    mapM_ putStrLn $ map exec (match1 e :: [Expr String])
+    putStrLn "--"
 
-    putStr "-- executed: "
-    print $ map exec (match1 e :: [Expr String])
-
-    putStrLn $ "Match2: " <> (match2 :: String)
-    print (match2 :: String)
-    mapM_ (putStrLn . exec) (match2 e :: [Expr String])
+    putStrLn $ "Match 2: " <> (match2 :: String)
+    putStrLn "- matched: "
+    mapM_ putStrLn $ map exec (match2 e :: [Expr String])
+    putStrLn "--"
 
     putStrLn $ "Match 3: " <> match3
+    putStrLn "- matched: "
+    mapM_ putStrLn $ map exec (match3 e :: [Expr String])
+    putStrLn "--"
     case match3 e :: Maybe (Expr String) of
-      Just e' -> putStrLn $ " -- found:" <> (exec e')
+      Just e' -> putStrLn $ "- found:" <> (exec e')
       Nothing -> putStrLn "Nothing found."

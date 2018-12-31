@@ -18,6 +18,11 @@ executable query
   other-modules:       Core.Types
                        Deep
                        Expr
+                       Expr.Deep    
+                       Expr.Expr    
+                       Expr.Literal 
+                       Expr.Name    
+                       Expr.Type    
                        Query
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5

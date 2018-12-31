@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Main where
   import Prelude hiding (any)
+  import Control.Applicative
   import Data.Functor.Foldable
   import Data.Monoid ((<>))
 
@@ -35,13 +36,14 @@ module Main where
   
   newtype Query e a = Query { unQuery :: QueryF (e (Query e a)) a }
 
+  type ExprQ a = Query ExprF a
+
   deriving instance Show (e (Query e a)) => Show (Query e a)
 
-  class Applicative f => Match q e f r where
-    alg :: r -> f r
-    match :: q -> e -> f r
+  class Match q e r where
+    match :: q -> e -> r
  
-  instance (Applicative f, Match a e (f e)) => Match (ExprF a) Expr (f Expr) where
+  instance (Alternative f, Match a Expr (f Expr)) => Match (ExprF a) Expr (f Expr) where
     match (Lit n) e@(Fix (Lit n')) | n == n' = pure e 
     match (Var n) e@(Fix (Var n')) | n == n' = pure e 
     match (Add l r) e@(Fix (Add l' r')) = (pure . e <>) <$> match l l' <> match r r'
@@ -51,8 +53,6 @@ module Main where
       matchQ Any e = pure e
       matchQ (Has q') e = matchQ q' e
       matchQ (Match e') e = match e' e
-
-  type ExprQ a = Query ExprF a
 
   ppExpr = cata pp where
     pp (Lit v) = v
