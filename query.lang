@@ -1,0 +1,26 @@
+@if_expr :: "if" ## Expr ::: "then" ## Expr ::: "else" ## Maybe Expr ::: "itemId" ## Expr
+@if_expr = 
+  if (@"if") 
+  { 
+    @"then" 
+  } 
+  @maybe else 
+  { 
+    @"else" 
+  }
+
+@let_ItemId :: "rvalue" ## Expr
+@let_ItemId = @lvalue ItemId = @"rvalue"
+
+@if_ItemId :: "if" ## Expr ::: "then" ## Expr ::: "else" ## Maybe Expr ::: "itemId" ## Expr
+@if_ItemId = @if_expr ( @if #= @has="itemId" ItemId )
+
+@if_in_while :: "value" ## [Expr]
+@if_in_while =
+  while 
+  {
+    if (@has ItemId)
+    {
+      @all @let_ItemId
+    }
+  }
