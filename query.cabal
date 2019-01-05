@@ -32,10 +32,12 @@ executable query
                      , conduit-combinators
                      , containers
                      , hashmap
+                     , HList
                      , mtl
                      , monadplus
                      , persistent
                      , persistent-template
                      , recursion-schemes
                      , traverse-with-class
+                     , deriving-compat
                      , text

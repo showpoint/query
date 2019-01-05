@@ -21,6 +21,6 @@
   {
     if (@has ItemId)
     {
-      @all @let_ItemId
+      @all @let_ItemId["value"="rvalue"]
     }
   }
