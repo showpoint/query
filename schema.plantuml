@@ -1,0 +1,46 @@
+@startuml schema
+
+entity Object {
+  * id
+  --
+  * type
+  * name
+}
+
+entity NameRef {
+  * id : Name
+  --
+  id : Object
+  * refType
+  * reference
+}
+
+entity ObjectProp {
+  * id
+  --
+  * id : Object
+  * propType
+  * property
+}
+
+object Reference {
+  id : Object
+  id : ObjectProp
+  path
+}
+
+entity Name {
+  * id
+  --
+  name
+}
+
+Reference --> ObjectProp
+Reference --> Object
+NameRef --> Reference
+
+NameRef }o--|| Object
+NameRef }o--|| Name
+ObjectProp }o--|| Object
+
+@enduml
